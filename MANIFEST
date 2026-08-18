@@ -1,0 +1,15 @@
+LICENSE
+Makefile.PL
+README.md
+lib/Physics/Electrodeposition.pm
+lib/Physics/Electrodeposition/GDSII.pm
+lib/Physics/Electrodeposition/Pattern.pm
+lib/Physics/Electrodeposition/CopperPlating.pm
+examples/copper_300mm.pl
+examples/copper_plating_example.pl
+examples/copper_through_mask_gdsii.pl
+examples/copper_300mm.pl
+examples/through_mask_reticle.gds
+t/electrodeposition.t
+t/gdsii.t
+t/pattern.t

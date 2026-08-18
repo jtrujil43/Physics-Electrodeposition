@@ -38,6 +38,15 @@ README.md                                This file
 Perl 5.10+ with core modules only (`POSIX`, `Test::More`, `FindBin`). No CPAN
 dependencies (the GDSII reader/writer is pure Perl).
 
+## Install
+
+```sh
+perl Makefile.PL
+make
+make test
+make install
+```
+
 ## Quick start
 
 ```sh
