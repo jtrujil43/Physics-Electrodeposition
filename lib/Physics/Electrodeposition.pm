@@ -2,9 +2,11 @@ package Physics::Electrodeposition;
 
 use strict;
 use warnings;
+use Carp qw(croak);
 use POSIX qw(floor);
+use Scalar::Util qw(looks_like_number);
 
-our $VERSION = '1.00';
+our $VERSION = '1.01';
 
 #-----------------------------------------------------------------------------
 # Physical constants (SI / CGS mixed as noted).  Internal length unit is cm,
@@ -14,6 +16,13 @@ use constant {
     FARADAY => 96485.33212,     # C / mol
     R_GAS   => 8.314462618,     # J / (mol K)
 };
+
+sub _is_finite_number {
+    my ($value) = @_;
+    return 0 unless defined $value && looks_like_number($value);
+    my $number = 0 + $value;
+    return $number == $number && $number * 0 == 0;
+}
 
 #=============================================================================
 # Constructor
@@ -319,6 +328,51 @@ sub mass_balance {
     $mb{additive_mL}        = $s->{additive_use} * ($Ah / 1000.0); # per kA*h
 
     return \%mb;
+}
+
+# Project the metal-ion inventory of a finite bath over repeated wafer runs.
+# A soluble anode replenishes ions according to mass_balance(); an inert anode
+# does not. The final physical inventory is clamped at zero while ion_deficit_mol
+# records how far an impossible recipe would exceed the available inventory.
+sub bath_inventory {
+    my ($s, %opts) = @_;
+
+    croak "bath_volume_l is required" unless exists $opts{bath_volume_l};
+    my $volume_l = $opts{bath_volume_l};
+    croak "bath_volume_l must be a positive number"
+        unless _is_finite_number($volume_l) && $volume_l > 0;
+
+    my $wafer_count = $opts{wafer_count} // 1;
+    croak "wafer_count must be a non-negative integer"
+        unless _is_finite_number($wafer_count)
+            && $wafer_count >= 0 && floor($wafer_count) == $wafer_count;
+
+    my $balance = $s->mass_balance;
+    my $initial_mol = $s->{ion_conc} * $volume_l;
+    my $consumed_mol = $balance->{ion_consumed_mol} * $wafer_count;
+    my $replenished_mol = $balance->{ion_replenished_mol} * $wafer_count;
+    my $net_change_mol = $replenished_mol - $consumed_mol;
+    my $raw_final_mol = $initial_mol + $net_change_mol;
+    my $ion_deficit_mol = $raw_final_mol < 0 ? -$raw_final_mol : 0;
+    my $final_mol = $raw_final_mol > 0 ? $raw_final_mol : 0;
+    my $final_conc = $final_mol / $volume_l;
+    my $change_percent = $s->{ion_conc} > 0
+        ? 100 * ($final_conc - $s->{ion_conc}) / $s->{ion_conc}
+        : 0;
+
+    return {
+        bath_volume_l              => $volume_l,
+        wafer_count                => $wafer_count,
+        initial_ion_mol            => $initial_mol,
+        ion_consumed_mol           => $consumed_mol,
+        ion_replenished_mol        => $replenished_mol,
+        net_ion_change_mol         => $net_change_mol,
+        final_ion_mol              => $final_mol,
+        final_ion_conc_M           => $final_conc,
+        concentration_change_percent => $change_percent,
+        ion_deficit_mol            => $ion_deficit_mol,
+        depleted                   => $raw_final_mol <= 0 ? 1 : 0,
+    };
 }
 
 #=============================================================================
@@ -875,6 +929,13 @@ Growth results from Faraday's law.
 
 Chemistry mass balance, including anode reaction, hydrogen side reaction, acid
 balance, gas evolution, and additive consumption.
+
+=item bath_inventory(bath_volume_l => $litres, wafer_count => $count)
+
+Project the metal-ion inventory across repeated wafer runs. Returns the initial,
+consumed, replenished, and final ion moles; final molarity; concentration change;
+and depletion/deficit indicators. C<bath_volume_l> must be positive and
+C<wafer_count> must be a non-negative integer (default 1).
 
 =item cell_voltage / power / energy / specific_energy_kWh_kg
 

@@ -9,7 +9,9 @@ lib/Physics/Electrodeposition/CopperPlating.pm
 examples/copper_300mm.pl
 examples/copper_plating_example.pl
 examples/copper_through_mask_gdsii.pl
+examples/bath_inventory.pl
 examples/through_mask_reticle.gds
+t/bath_inventory.t
 t/copper_plating.t
 t/electrodeposition.t
 t/gdsii.t

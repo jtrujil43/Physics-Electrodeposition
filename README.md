@@ -8,6 +8,8 @@ physics to predict:
 - **Film thickness** and deposition rate
 - A full **mass balance** of the chemistry (ion consumption, anode reaction,
   hydrogen side reaction, acid balance, gas evolution, additive consumption)
+- **Bath inventory forecasting** across repeated wafers, including soluble-anode
+  replenishment, inert-anode depletion, and an out-of-inventory warning
 - **Power input** (cell voltage breakdown, power, energy, specific energy)
 - **Uniformity and smoothness** insight from tool geometry, wafer size, chemistry
   and process conditions (limiting current, Wagner number, seed *terminal effect*,
@@ -27,7 +29,9 @@ lib/Physics/Electrodeposition/GDSII.pm   GDSII reader/writer/flattener
 lib/Physics/Electrodeposition/Pattern.pm Pattern (open area, density, loading)
 examples/copper_300mm.pl                 Worked example: Cu on a 300 mm wafer
 examples/copper_through_mask_gdsii.pl    Through‑mask Cu pillars from a GDSII
+examples/bath_inventory.pl               Multi-wafer bath depletion forecast
 t/electrodeposition.t                    Core physics tests
+t/bath_inventory.t                       Bath forecasting and validation tests
 t/gdsii.t                                GDSII reader/writer/flatten tests
 t/pattern.t                              Pattern + patterned‑model tests
 README.md                                This file
@@ -56,6 +60,9 @@ perl -Ilib examples/copper_300mm.pl
 # run the through-mask (GDSII pattern) example
 perl -Ilib examples/copper_through_mask_gdsii.pl
 
+# compare soluble- and inert-anode bath inventory over repeated wafers
+perl -Ilib examples/bath_inventory.pl
+
 # run the tests
 perl -Ilib t/electrodeposition.t      # or: prove -Ilib t/
 ```
@@ -79,6 +86,10 @@ print $ecd->report;                    # full formatted report
 my $h   = $ecd->film_thickness_um;     # 1.0 um
 my $P   = $ecd->power;                 # cell power, W
 my $mb  = $ecd->mass_balance;          # hashref: species moles/grams
+my $inv = $ecd->bath_inventory(         # project a finite production bath
+    bath_volume_l => 20,
+    wafer_count   => 100,
+);
 my $nu  = $ecd->nonuniformity_percent; # estimated within-wafer non-uniformity
 ```
 
@@ -107,6 +118,10 @@ constant, `M` = molar mass, `ρ` = density, `CE` = current efficiency.
 - **Inert anode:** `2 H₂O → O₂ + 4 H⁺ + 4 e⁻` (bath depletes, O₂ + acid produced)
 - **Cathode side reaction** when `CE < 1`: `2 H⁺ + 2 e⁻ → H₂`
 - **Additives** (accelerator/suppressor/leveler) consumed per amp‑hour of charge
+
+`bath_inventory` scales the per-wafer ion balance over a requested wafer count,
+then applies it to a finite bath volume. It reports final molarity and explicitly
+flags recipes that demand more metal ion than the bath contains.
 
 ### Power — lumped cell‑voltage model
 
@@ -236,7 +251,8 @@ resistive bath, or dummy‑fill as mitigations.
 | Method | Returns |
 |---|---|
 | `film_thickness_um`, `deposition_rate_um_min`, `process_time` | growth results |
-| `mass_deposited`, `moles_deposited`, `charge`, `mass_balance` | chemistry mass balance |
+| `mass_deposited`, `moles_deposited`, `charge`, `mass_balance` | per-wafer chemistry mass balance |
+| `bath_inventory` | finite-bath ion inventory across repeated wafers |
 | `cell_voltage`, `power`, `energy`, `specific_energy_kWh_kg` | electrical power |
 | `limiting_current_density`, `current_fraction_of_limit` | transport limit |
 | `wagner_number`, `terminal_effect_drop`, `terminal_effect_ratio` | current distribution |
